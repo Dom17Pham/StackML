@@ -15,15 +15,30 @@ filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), file_name)
 stackoverflow_data = pd.read_csv(filepath)
 
 # Drop any row where the compensation total (salary + bonuses + perks) is NA
+# This will remove missing values that might affect data accuracy 
 stackoverflow_data = stackoverflow_data.dropna(subset=['CompTotal', 'Employment', 'EdLevel', 'YearsCode'])
 
 # Prediction Target
 y = stackoverflow_data.CompTotal
 
+# Calculate the IQR for salaries
+Q1 = np.percentile(y, 25)
+Q3 = np.percentile(y, 75)
+IQR = Q3 - Q1
+
+# Define the lower and upper bounds for outliers
+lower_bound = Q1 - 1.5 * IQR
+upper_bound = Q3 + 1.5 * IQR
+
+# Filter out the outliers
+outlier_mask = (y >= lower_bound) & (y <= upper_bound)
+filtered_data = stackoverflow_data[outlier_mask]
+
 # Specify the features to use for prediction model
 features = ['Employment', 'EdLevel', 'YearsCode']
 
-x = stackoverflow_data[features]
+x = filtered_data[features]
+y = filtered_data.CompTotal
 
 # Replace all entries with 'Less than 1 year' to '0'
 x = x.replace('Less than 1 year', '0')
@@ -33,9 +48,6 @@ x = x.replace('More than 50 years', '50')
 
 # Convert the YearsCode dtype from object to int64
 x.YearsCode = x['YearsCode'].astype('int64')
-
-# Debug check for value replacement 
-# print(x.loc[x.YearsCode == 0])
 
 # Function to handle non numerical data by converting each unique element into a int key 
 def handle_non_numerical_data(df):
@@ -60,17 +72,8 @@ def handle_non_numerical_data(df):
 
 x = handle_non_numerical_data(x)
 
-# Debug check for data conversion 
-# print(x.head())
-
 # Split data into training and validation data
 train_x, val_x, train_y, val_y = train_test_split(x, y, random_state=1)
-
-# Debug check data splitting
-# print(train_x.head())
-# print(train_y.head())
-# print(val_x.head())
-# print(val_y.head())
 
 # Random Forest 
 RF_model = RandomForestRegressor(random_state=1)
