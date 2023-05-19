@@ -8,14 +8,13 @@ from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import train_test_split
 
 
-# Loading the data
+# Loading the survey data into a dataframe
 file_name = "StackOverflowSurvey2022.csv"
 filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), file_name)
 
-stackoverflow_data = pd.read_csv(filepath)
+stackoverflow_data = pd.read_csv(filepath) 
 
 # Drop any row where the compensation total (salary + bonuses + perks) is NA
-# This will remove missing values that might affect data accuracy 
 stackoverflow_data = stackoverflow_data.dropna(subset=['CompTotal', 'Employment', 'EdLevel', 'YearsCode'])
 
 # Prediction Target
@@ -79,17 +78,41 @@ train_x, val_x, train_y, val_y = train_test_split(x, y, random_state=1)
 RF_model = RandomForestRegressor(random_state=1)
 RF_model.fit(train_x, train_y)
 RF_predictions = RF_model.predict(val_x)
+RF_mae = mean_absolute_error(val_y, RF_predictions)
 
 # Linear Regression
 LR_model = LinearRegression()
 LR_model.fit(train_x, train_y)
 LR_predictions = LR_model.predict(val_x)
+LR_mae = mean_absolute_error(val_y, LR_predictions)
 
-# Results 
+# Printing the results of both models
 print('Random Forest model:')
 print('Predictions:', RF_predictions)
-print('MAE:', mean_absolute_error(val_y, RF_predictions), '\n')
+print('MAE:', RF_mae, '\n')
 
 print('Linear Regression model:')
 print('Predictions:', LR_predictions)
-print('MAE:', mean_absolute_error(val_y, LR_predictions), '\n')
+print('MAE:', LR_mae, '\n')
+
+# Plotting the results
+plt.figure(figsize=(10, 6))
+
+# Scatter plot of actual vs. predicted values for Random Forest
+plt.subplot(1, 2, 1)
+plt.scatter(val_y, RF_predictions, alpha=0.5)
+plt.plot(val_y, val_y, color='red', linestyle='--')
+plt.xlabel('Actual Salary')
+plt.ylabel('Predicted Salary')
+plt.title('Random Forest Model\nMAE: {:.2f}'.format(RF_mae))
+
+# Scatter plot of actual vs. predicted values for Linear Regression
+plt.subplot(1, 2, 2)
+plt.scatter(val_y, LR_predictions, alpha=0.5)
+plt.plot(val_y, val_y, color='red', linestyle='--')
+plt.xlabel('Actual Salary')
+plt.ylabel('Predicted Salary')
+plt.title('Linear Regression Model\nMAE: {:.2f}'.format(LR_mae))
+
+plt.tight_layout()
+plt.show()
