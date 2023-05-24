@@ -14,8 +14,12 @@ filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), file_name)
 
 stackoverflow_data = pd.read_csv(filepath) 
 
-# Drop any row where the compensation total (salary + bonuses + perks) is NA
+# Drop rows where the compensation total (salary + bonuses + perks) is NA
 stackoverflow_data = stackoverflow_data.dropna(subset=['CompTotal', 'Employment', 'EdLevel', 'YearsCode'])
+
+# Drop rows where the education is not clearly defined
+stackoverflow_data = stackoverflow_data[stackoverflow_data['EdLevel'] != 'Something else']
+stackoverflow_data = stackoverflow_data[stackoverflow_data['EdLevel'] != 'Some college/university study without earning a degree']
 
 # Prediction Target
 y = stackoverflow_data.CompTotal
@@ -47,6 +51,21 @@ x = x.replace('More than 50 years', '50')
 
 # Convert the YearsCode dtype from object to int64
 x.YearsCode = x['YearsCode'].astype('int64')
+
+# Create a dictionary mapping education levels to ordinal values
+education_levels = ['Primary/elementary school',
+                    'Secondary school (e.g. American high school, German Realschule or Gymnasium, etc.)',
+                    'Associate degree (A.A., A.S., etc.)',
+                    'Bachelor’s degree (B.A., B.S., B.Eng., etc.)',
+                    'Master’s degree (M.A., M.S., M.Eng., MBA, etc.)',
+                    'Professional degree (JD, MD, etc.)',
+                    'Other doctoral degree (Ph.D., Ed.D., etc.)']
+
+ordinal_values = [0, 1, 2, 3, 4, 5, 6]
+education_mapping = {level: value for level, value in zip(education_levels, ordinal_values)}
+
+# Apply ordinal encoding to the 'EdLevel' feature
+x['EdLevel'] = x['EdLevel'].map(education_mapping)
 
 # Function to handle non numerical data by converting each unique element into a int key 
 def handle_non_numerical_data(df):
@@ -80,20 +99,11 @@ RF_model.fit(train_x, train_y)
 RF_predictions = RF_model.predict(val_x)
 RF_mae = mean_absolute_error(val_y, RF_predictions)
 
-# Linear Regression
-LR_model = LinearRegression()
-LR_model.fit(train_x, train_y)
-LR_predictions = LR_model.predict(val_x)
-LR_mae = mean_absolute_error(val_y, LR_predictions)
 
 # Printing the results of both models
 print('Random Forest model:')
 print('Predictions:', RF_predictions)
 print('MAE:', RF_mae, '\n')
-
-print('Linear Regression model:')
-print('Predictions:', LR_predictions)
-print('MAE:', LR_mae, '\n')
 
 # Plotting the results
 plt.figure(figsize=(10, 6))
@@ -105,14 +115,6 @@ plt.plot(val_y, val_y, color='red', linestyle='--')
 plt.xlabel('Actual Salary')
 plt.ylabel('Predicted Salary')
 plt.title('Random Forest Model\nMAE: {:.2f}'.format(RF_mae))
-
-# Scatter plot of actual vs. predicted values for Linear Regression
-plt.subplot(1, 2, 2)
-plt.scatter(val_y, LR_predictions, alpha=0.5)
-plt.plot(val_y, val_y, color='red', linestyle='--')
-plt.xlabel('Actual Salary')
-plt.ylabel('Predicted Salary')
-plt.title('Linear Regression Model\nMAE: {:.2f}'.format(LR_mae))
 
 plt.tight_layout()
 plt.show()
