@@ -3,9 +3,9 @@ import numpy as np
 import os 
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV
 
 
 # Loading the survey data into a dataframe
@@ -90,15 +90,28 @@ def handle_non_numerical_data(df):
 
 x = handle_non_numerical_data(x)
 
+# Define the hyperparameters to tune
+param_grid = {
+    'n_estimators': [100, 200, 300],
+    'max_depth': [None, 5, 10],
+    'min_samples_split': [2, 5, 10],
+    'min_samples_leaf': [1, 2, 4]
+}
+
+# Create the RandomForestRegressor model
+RF_model = RandomForestRegressor(random_state=1)
+
+# Create the GridSearchCV instance
+grid_search = GridSearchCV(RF_model, param_grid, cv=5, scoring='neg_mean_absolute_error')
+
 # Split data into training and validation data
 train_x, val_x, train_y, val_y = train_test_split(x, y, random_state=1)
 
-# Random Forest 
-RF_model = RandomForestRegressor(random_state=1)
-RF_model.fit(train_x, train_y)
-RF_predictions = RF_model.predict(val_x)
+# Perform the grid search on the training data to get the best model and use best model for predictions
+grid_search.fit(train_x, train_y)
+best_model = grid_search.best_estimator_
+RF_predictions = best_model.predict(val_x)
 RF_mae = mean_absolute_error(val_y, RF_predictions)
-
 
 # Printing the results of both models
 print('Random Forest model:')
