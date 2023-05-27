@@ -5,8 +5,7 @@ import time
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from tqdm import tqdm
 
 
@@ -32,8 +31,8 @@ Q3 = np.percentile(y, 75)
 IQR = Q3 - Q1
 
 # Define the lower and upper bounds for outliers
-lower_bound = Q1 - 1.5 * IQR
-upper_bound = Q3 + 1.5 * IQR
+lower_bound = Q1 - 0.15 * IQR
+upper_bound = Q3 + 0.15 * IQR
 
 # Filter out the outliers
 outlier_mask = (y >= lower_bound) & (y <= upper_bound)
@@ -94,8 +93,8 @@ x = handle_non_numerical_data(x)
 
 # Define the hyperparameters to tune
 param_grid = {
-    'n_estimators': [100, 200, 300],
-    'max_depth': [None, 5, 10],
+    'n_estimators': [200, 300, 400],
+    'max_depth': [None, 50, 75, 125],
     'min_samples_split': [2, 5, 10],
     'min_samples_leaf': [1, 2, 4]
 }
@@ -104,21 +103,17 @@ param_grid = {
 RF_model = RandomForestRegressor(random_state=1)
 
 # Create the GridSearchCV instance
-grid_search = GridSearchCV(RF_model, param_grid, cv=5, scoring='neg_mean_absolute_error')
+random_search = RandomizedSearchCV(RF_model, param_grid, n_iter=15, cv=5, scoring='neg_mean_absolute_error', n_jobs=4, random_state=1)
 
 # Split data into training and validation data
 train_x, val_x, train_y, val_y = train_test_split(x, y, random_state=1)
 
-
-# with tqdm(total=2, desc="Training Progress", unit="step", leave=False) as pbar:
-
-# Perform grid search
+# Perform random search
+print('Randomized Search in Progress . . .')
 start_time = time.time()
-grid_search.fit(train_x, train_y)
-best_model = grid_search.best_estimator_
-grid_search_elapsed_time = time.time() - start_time
-
-# pbar.update(1)  # Update the main progress bar
+random_search.fit(train_x, train_y)
+best_model = random_search.best_estimator_
+search_elapsed_time = time.time() - start_time
 
 # Make predictions
 with tqdm(total=len(val_x), desc="Prediction Progress", unit="sample") as pbar_pred:
@@ -132,19 +127,14 @@ with tqdm(total=len(val_x), desc="Prediction Progress", unit="sample") as pbar_p
     pred_elapsed_time = time.time() - start_time
     pbar_pred.set_postfix({"Elapsed Time": f"{pred_elapsed_time:.2f}s"})
 
-Total_elapsed_time = grid_search_elapsed_time + pred_elapsed_time
+Total_elapsed_time = search_elapsed_time + pred_elapsed_time
 RF_predictions = np.concatenate(RF_predictions)
 RF_mae = mean_absolute_error(val_y, RF_predictions)
 
-
-# # Perform the grid search on the training data to get the best model and use best model for predictions
-# grid_search.fit(train_x, train_y)
-# best_model = grid_search.best_estimator_
-# RF_predictions = best_model.predict(val_x)
-# RF_mae = mean_absolute_error(val_y, RF_predictions)
-
 # Printing the predictions
-print(f"Total Elapsed Time for Predictions: {Total_elapsed_time:.2f}s")
+minutes = int(Total_elapsed_time // 60)
+seconds = int(Total_elapsed_time % 60)
+print(f"Total Elapsed Time for Predictions: {minutes} minutes {seconds} seconds")
 print('Predictions:', RF_predictions)
 print('MAE:', RF_mae, '\n')
 
