@@ -1,1 +1,6 @@
 StackOverflowSurvey2022.csv
+Include/
+Lib/
+Scripts/
+share/
+pyvenv.cfg
