@@ -15,8 +15,8 @@ filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), file_name)
 
 stackoverflow_data = pd.read_csv(filepath) 
 
-# Drop rows where the compensation total (salary + bonuses + perks) is NA
-stackoverflow_data = stackoverflow_data.dropna(subset=['CompTotal', 'Employment', 'EdLevel', 'YearsCode'])
+# Drop rows where the specified columns are NA in any of these columns
+stackoverflow_data = stackoverflow_data.dropna(subset=['ConvertedCompYearly', 'Employment', 'EdLevel', 'YearsCode', 'DevType'])
 
 # Drop rows where the education is not clearly defined
 stackoverflow_data = stackoverflow_data[
@@ -32,7 +32,7 @@ stackoverflow_data = stackoverflow_data[
 ]
 
 # Prediction Target 
-y = stackoverflow_data.CompTotal
+y = stackoverflow_data.ConvertedCompYearly
 
 # Calculate the IQR for salaries
 Q1 = np.percentile(y, 25)
@@ -48,10 +48,10 @@ outlier_mask = (y >= lower_bound) & (y <= upper_bound)
 filtered_data = stackoverflow_data[outlier_mask]
 
 # Specify the features to use for prediction model
-features = ['Employment', 'EdLevel', 'YearsCode']
+features = ['Employment', 'EdLevel', 'YearsCode', 'DevType']
 
 x = filtered_data[features]
-y = filtered_data.CompTotal
+y = filtered_data.ConvertedCompYearly
 
 # Replace all entries with 'Less than 1 year' to '0'
 x = x.replace('Less than 1 year', '0')
@@ -63,7 +63,7 @@ x = x.replace('More than 50 years', '50')
 x.YearsCode = x['YearsCode'].astype('int64')
 
 # Perform CatBoost encoding for the categorical features
-encoder = CatBoostEncoder(cols=['Employment', 'EdLevel'])
+encoder = CatBoostEncoder(cols=['Employment', 'EdLevel', 'DevType'])
 x = encoder.fit_transform(x, y)
 
 # Define the hyperparameters to tune
@@ -130,8 +130,8 @@ plt.figure(figsize=(10, 6))
 plt.subplot(1, 2, 1)
 plt.scatter(val_y, XGB_predictions, alpha=0.5)
 plt.plot(val_y, val_y, color='red', linestyle='--')
-plt.xlabel('Actual Salary')
-plt.ylabel('Predicted Salary')
+plt.xlabel('Actual Yearly Salary (USD)')
+plt.ylabel('Predicted Yearly Salary (USD)')
 plt.title('XGBoost Model\nMAE: {:.2f}'.format(RF_mae))
 
 # Plot feature importance
