@@ -4,11 +4,10 @@ import os
 import time
 import matplotlib.pyplot as plt
 import xgboost as xgb
-from sklearn.ensemble import RandomForestRegressor
+from category_encoders import CatBoostEncoder
 from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from tqdm import tqdm
-
 
 # Loading the survey data into a dataframe
 file_name = "StackOverflowSurvey2022.csv"
@@ -63,43 +62,9 @@ x = x.replace('More than 50 years', '50')
 # Convert the YearsCode dtype from object to int64
 x.YearsCode = x['YearsCode'].astype('int64')
 
-# Create a dictionary mapping education levels to ordinal values
-education_levels = ['Primary/elementary school',
-                    'Secondary school (e.g. American high school, German Realschule or Gymnasium, etc.)',
-                    'Associate degree (A.A., A.S., etc.)',
-                    'Bachelor’s degree (B.A., B.S., B.Eng., etc.)',
-                    'Master’s degree (M.A., M.S., M.Eng., MBA, etc.)',
-                    'Professional degree (JD, MD, etc.)',
-                    'Other doctoral degree (Ph.D., Ed.D., etc.)']
-
-ordinal_values = [0, 1, 2, 3, 4, 5, 6]
-education_mapping = {level: value for level, value in zip(education_levels, ordinal_values)}
-
-# Apply ordinal encoding to the 'EdLevel' feature
-x['EdLevel'] = x['EdLevel'].map(education_mapping)
-
-# Function to handle non numerical data by converting each unique element into a int key 
-def handle_non_numerical_data(df):
-    columns = df.columns.values
-    for column in columns:
-        text_digits_vals = {}
-        def convert_to_int(val):
-            return text_digits_vals[val]
-        
-        if df[column].dtype != np.int64 and df[column].dtype != np.float64:
-            column_contents = df[column].values.tolist()
-            unique_elements = set(column_contents)
-            x = 0
-            for unique in unique_elements:
-                if unique not in text_digits_vals:
-                    text_digits_vals[unique] = x
-                    x+=1
-            
-            df[column] = list(map(convert_to_int, df[column]))
-
-    return df
-
-x = handle_non_numerical_data(x)
+# Perform CatBoost encoding for the categorical features
+encoder = CatBoostEncoder(cols=['Employment', 'EdLevel'])
+x = encoder.fit_transform(x, y)
 
 # Define the hyperparameters to tune
 param_grid = {
