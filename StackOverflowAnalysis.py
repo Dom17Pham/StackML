@@ -4,16 +4,21 @@ import os
 import time
 import matplotlib.pyplot as plt
 import xgboost as xgb
+import optuna
 from category_encoders import CatBoostEncoder
 from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from tqdm import tqdm
 
-# Loading the survey data into a dataframe
-file_name = "StackOverflowSurvey2022.csv"
-filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), file_name)
+# Load survey datasets into a dataframe 
+directory = os.path.dirname(os.path.abspath(__file__))
+stackoverflow_data = pd.DataFrame()
 
-stackoverflow_data = pd.read_csv(filepath) 
+for file_name in os.listdir(directory):
+    if file_name.endswith(".csv"):
+        filepath = os.path.join(directory, file_name)
+        df = pd.read_csv(filepath)
+        stackoverflow_data = pd.concat([stackoverflow_data, df], ignore_index=True)
 
 # Drop rows where the specified columns are NA in any of these columns
 stackoverflow_data = stackoverflow_data.dropna(subset=['ConvertedCompYearly', 'Employment', 'EdLevel', 'YearsCode', 'DevType'])
@@ -66,30 +71,73 @@ x.YearsCode = x['YearsCode'].astype('int64')
 encoder = CatBoostEncoder(cols=['Employment', 'EdLevel', 'DevType'])
 x = encoder.fit_transform(x, y)
 
-# Define the hyperparameters to tune
-param_grid = {
-    'n_estimators': [100, 200, 300],
-    'max_depth': [3, 5, 7],
-    'learning_rate': [0.1, 0.01, 0.001],
-    'subsample': [0.8, 0.9, 1.0],
-    'colsample_bytree': [0.8, 0.9, 1.0],
-}
+def objective(trial):
+        # Define the hyperparameters to optimize
+    n_estimators = trial.suggest_int('n_estimators', 100, 500)
+    max_depth = trial.suggest_int('max_depth', 3, 10)
+    learning_rate = trial.suggest_float('learning_rate', 0.001, 0.1, log=True)
+    subsample = trial.suggest_float('subsample', 0.8, 1.0)
+    colsample_bytree = trial.suggest_float('colsample_bytree', 0.8, 1.0)
 
-# Create the XGBRegressor model
-XGB_model = xgb.XGBRegressor(n_jobs=4,random_state=1)
+    # Build and train your XGBoost model using the hyperparameters
+    model = xgb.XGBRegressor(
+        n_estimators=n_estimators,
+        max_depth=max_depth,
+        learning_rate=learning_rate,
+        subsample=subsample,
+        colsample_bytree=colsample_bytree
+    )
 
-# Create the GridSearchCV instance
-random_search = RandomizedSearchCV(XGB_model, param_grid, n_iter=15, cv=5, scoring='neg_mean_absolute_error', n_jobs=4, random_state=1)
+    # Train and evaluate the model
+    model.fit(train_x, train_y)
+    y_pred = model.predict(val_x)
+    score = mean_absolute_error(val_y, y_pred)
+
+    return score
+
+# # Define the hyperparameters to tune
+# param_grid = {
+#     'n_estimators': [100, 250, 500],
+#     'max_depth': [3, 5, 7],
+#     'learning_rate': [0.1, 0.01, 0.001],
+#     'subsample': [0.8, 0.9, 1.0],
+#     'colsample_bytree': [0.8, 0.9, 1.0],
+# }
+
+# # Create the XGBRegressor model
+# XGB_model = xgb.XGBRegressor(
+#     n_jobs=4,
+#     random_state=1,
+# )
+
+# # Create the GridSearchCV instance
+# random_search = RandomizedSearchCV(XGB_model, param_grid, n_iter=15, cv=5, scoring='neg_mean_absolute_error', n_jobs=4, random_state=1)
 
 # Split data into training and validation data
 train_x, val_x, train_y, val_y = train_test_split(x, y, random_state=1)
 
-# Perform random search
-print('Randomized Search in Progress . . .')
+# Set up the Optuna study
 start_time = time.time()
-random_search.fit(train_x, train_y)
-best_model = random_search.best_estimator_
-search_elapsed_time = time.time() - start_time
+study = optuna.create_study(direction='minimize', sampler=optuna.samplers.TPESampler())
+study.optimize(objective, n_trials=100)
+trial_elapsed_time = time.time() - start_time
+
+# Get the best hyperparameters
+best_params = study.best_params
+
+# # Perform random search
+# print('Randomized Search in Progress . . .')
+# start_time = time.time()
+# random_search.fit(train_x, train_y)
+# best_model = random_search.best_estimator_
+# print('Randomized Search Finished.')
+# search_elapsed_time = time.time() - start_time
+
+# Build the XGBoost model using the best hyperparameters
+best_model = xgb.XGBRegressor(**best_params)
+
+# Train the best model on the entire training data
+best_model.fit(train_x, train_y)
 
 # Get feature importance scores
 importance_scores = best_model.feature_importances_
@@ -107,9 +155,10 @@ with tqdm(total=len(val_x), desc="Prediction Progress", unit="sample") as pbar_p
     pred_elapsed_time = time.time() - start_time
     pbar_pred.set_postfix({"Elapsed Time": f"{pred_elapsed_time:.2f}s"})
 
-Total_elapsed_time = search_elapsed_time + pred_elapsed_time
 XGB_predictions = np.array(XGB_predictions)
 RF_mae = mean_absolute_error(val_y, XGB_predictions)
+# Total_elapsed_time = search_elapsed_time + pred_elapsed_time
+Total_elapsed_time = trial_elapsed_time + pred_elapsed_time
 
 # Sort feature importance scores in descending order
 sorted_indices = importance_scores.argsort()[::-1]
@@ -117,11 +166,14 @@ sorted_scores = importance_scores[sorted_indices]
 sorted_names = feature_names[sorted_indices]
 
 # Printing the predictions
-minutes = int(Total_elapsed_time // 60)
-seconds = int(Total_elapsed_time % 60)
-print(f"Total Elapsed Time for Predictions: {minutes} minutes {seconds} seconds")
-print('Predictions:', XGB_predictions)
-print('MAE:', RF_mae, '\n')
+print('\nPredictions:\n', XGB_predictions, '\n')
+# Print performance metrics
+print("--- PERFORMANCE REPORT --- ")
+print('MAE:', RF_mae)
+# 
+print(f"Elapsed Time for Optuna study: {int(trial_elapsed_time // 60)} minutes {int(trial_elapsed_time % 60)} seconds")
+print(f"Elapsed Time for Predictions: {int(pred_elapsed_time // 60)} minutes {int(pred_elapsed_time % 60)} seconds")
+print(f"Total Elapsed Time: {int(Total_elapsed_time // 60)} minutes {int(Total_elapsed_time % 60)} seconds")
 
 # Plotting the results
 plt.figure(figsize=(10, 6))
