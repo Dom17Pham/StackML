@@ -95,24 +95,6 @@ def objective(trial):
 
     return score
 
-# # Define the hyperparameters to tune
-# param_grid = {
-#     'n_estimators': [100, 250, 500],
-#     'max_depth': [3, 5, 7],
-#     'learning_rate': [0.1, 0.01, 0.001],
-#     'subsample': [0.8, 0.9, 1.0],
-#     'colsample_bytree': [0.8, 0.9, 1.0],
-# }
-
-# # Create the XGBRegressor model
-# XGB_model = xgb.XGBRegressor(
-#     n_jobs=4,
-#     random_state=1,
-# )
-
-# # Create the GridSearchCV instance
-# random_search = RandomizedSearchCV(XGB_model, param_grid, n_iter=15, cv=5, scoring='neg_mean_absolute_error', n_jobs=4, random_state=1)
-
 # Split data into training and validation data
 train_x, val_x, train_y, val_y = train_test_split(x, y, random_state=1)
 
@@ -124,14 +106,6 @@ trial_elapsed_time = time.time() - start_time
 
 # Get the best hyperparameters
 best_params = study.best_params
-
-# # Perform random search
-# print('Randomized Search in Progress . . .')
-# start_time = time.time()
-# random_search.fit(train_x, train_y)
-# best_model = random_search.best_estimator_
-# print('Randomized Search Finished.')
-# search_elapsed_time = time.time() - start_time
 
 # Build the XGBoost model using the best hyperparameters
 best_model = xgb.XGBRegressor(**best_params)
@@ -157,7 +131,6 @@ with tqdm(total=len(val_x), desc="Prediction Progress", unit="sample") as pbar_p
 
 XGB_predictions = np.array(XGB_predictions)
 RF_mae = mean_absolute_error(val_y, XGB_predictions)
-# Total_elapsed_time = search_elapsed_time + pred_elapsed_time
 Total_elapsed_time = trial_elapsed_time + pred_elapsed_time
 
 # Sort feature importance scores in descending order
@@ -167,10 +140,10 @@ sorted_names = feature_names[sorted_indices]
 
 # Printing the predictions
 print('\nPredictions:\n', XGB_predictions, '\n')
+
 # Print performance metrics
 print("--- PERFORMANCE REPORT --- ")
 print('MAE:', RF_mae)
-# 
 print(f"Elapsed Time for Optuna study: {int(trial_elapsed_time // 60)} minutes {int(trial_elapsed_time % 60)} seconds")
 print(f"Elapsed Time for Predictions: {int(pred_elapsed_time // 60)} minutes {int(pred_elapsed_time % 60)} seconds")
 print(f"Total Elapsed Time: {int(Total_elapsed_time // 60)} minutes {int(Total_elapsed_time % 60)} seconds")
