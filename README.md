@@ -4,7 +4,7 @@
 This project utilizes the Stack Overflow 2022 Developer Survey data to build a machine learning model that employs the XGBoost algorithm 
 to predict salaries based on various features such as employment status, education level, years of coding experience, and developer roles. 
 
-The goal is to provide insights into the factors that influence salary levels in the software development industry.
+The goal is to gain insights into trends or pattern on factors that influence salary levels in the software development industry.
 
 ## Getting Started
 1) Create and activate a virtual environment:
